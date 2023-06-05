@@ -1,32 +1,65 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import { Hono } from 'hono';
+import { validator } from 'hono/validator';
 
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
-}
-
-export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
-	},
+export type Env = {
+  DB: D1Database;
 };
+
+const app = new Hono<{ Bindings: Env }>();
+
+app.get('/', (c) => {
+  return c.json({ status: 'Running' });
+});
+
+app.get('/posts', async (c) => {
+  const posts = await c.env.DB.prepare('select id, title, content from Post where published = 1 limit 20').all();
+  return c.json(posts.results);
+});
+
+type Post = {
+  id: number;
+  authorId: number;
+  title: string;
+  content: string;
+  published: number;
+  createdAt: string;
+};
+
+app.post(
+  '/posts',
+  validator('json', () => {
+    return {
+      authorId: 1,
+      title: 'Cloudflare Workersを使ってみた',
+      content: 'APIがすぐデプロイできてすごい',
+    };
+  }),
+  async (c) => {
+    const input = c.req.valid('json');
+
+    const post = await c.env.DB.prepare(
+      'insert into Post (authorId, title, content, published, createdAt) values (?, ?, ?, ?, ?) returning *'
+    )
+      .bind(input.authorId, input.title, input.content, 1, new Date().toISOString())
+      .first<Post>();
+
+    return c.json(post);
+  }
+);
+
+app.delete('/posts/:id', async (c) => {
+  const id = c.req.param('id');
+  await c.env.DB.prepare('delete from Post where id = ?').bind(id).run();
+  return c.json(undefined, 204);
+});
+
+app.put('/posts/:id', async (c) => {
+  const id = c.req.param('id');
+  const post = await c.env.DB.prepare('update Post set title = ? where id = ? returning *').bind('新しいタイトル', id).first<Post | null>();
+
+  console.log(post);
+
+  return c.json(undefined, 204);
+});
+
+export default app;
