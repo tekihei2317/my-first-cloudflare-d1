@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler publish",
-    "start": "wrangler dev"
+    "start": "wrangler dev",
+    "migrate:create": "wrangler d1 migrations create blog",
+    "migrate:apply": "wrangler d1 migrations apply blog --local",
+    "migrate:deploy": "wrangler d1 migrations apply blog"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20230419.0",
