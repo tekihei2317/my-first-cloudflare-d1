@@ -5,9 +5,10 @@
   "scripts": {
     "deploy": "wrangler publish",
     "start": "wrangler dev",
-    "migrate:create": "wrangler d1 migrations create blog",
+    "migrate:dev": "./scripts/migration.sh",
+    "migrate:create": "./scripts/migration.sh --create-only",
     "migrate:apply": "wrangler d1 migrations apply blog --local",
-    "migrate:deploy": "wrangler d1 migrations apply blog"
+    "migrate:apply:production": "wrangler d1 migrations apply blog"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20230419.0",
